@@ -1,5 +1,5 @@
 [project]
-name = "moderated-chat"
+name = "app"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -10,4 +10,11 @@ dependencies = [
     "djangorestframework>=3.16.1",
     "psycopg[binary]>=3.3.2",
     "python-decouple>=3.8",
+    "celery>=5.4.0",
+    "channels>=4.0.0",
+    "channels-redis>=4.2.0",
+    "djangorestframework-simplejwt>=5.4.0",
+    "model-bakery>=1.20.0",
+    "pytest-django>=4.9.0",
+    "pytest-asyncio>=0.24.0",
 ]
