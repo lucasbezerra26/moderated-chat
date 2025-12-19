@@ -1,7 +1,11 @@
 from typing import Optional
+
+from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.db.models import QuerySet
-from app.chat.models import Room, Message
+
 from app.accounts.models import User
+from app.chat.models import Message, Room, RoomParticipant
 
 
 class MessageService:
@@ -11,11 +15,7 @@ class MessageService:
     """
 
     @staticmethod
-    async def create_message(
-        room: Room,
-        author: User,
-        content: str
-    ) -> Message:
+    async def create_message(room: Room, author: User, content: str) -> Message:
         """
         Cria uma mensagem em estado PENDING e dispara moderação assíncrona.
 
@@ -28,23 +28,17 @@ class MessageService:
             Message: Mensagem criada com status PENDING
         """
         message = await Message.objects.acreate(
-            room=room,
-            author=author,
-            content=content,
-            status=Message.Status.PENDING
+            room=room, author=author, content=content, status=Message.Status.PENDING
         )
 
         from app.moderation.tasks import moderate_message_task
+
         moderate_message_task.delay(str(message.id))
 
         return message
 
     @staticmethod
-    async def get_room_messages(
-        room: Room,
-        status: Optional[str] = None,
-        limit: int = 50
-    ) -> QuerySet[Message]:
+    async def get_room_messages(room: Room, status: Optional[str] = None, limit: int = 50) -> QuerySet[Message]:
         """
         Busca mensagens de uma sala com filtros opcionais.
 
@@ -56,65 +50,93 @@ class MessageService:
         Returns:
             QuerySet[Message]: QuerySet de mensagens
         """
-        queryset = Message.objects.filter(room=room).select_related('author')
+        queryset = Message.objects.filter(room=room).select_related("author")
 
         if status:
             queryset = queryset.filter(status=status)
 
-        return queryset.order_by('-created_at')[:limit]
+        return queryset.order_by("-created_at")[:limit]
 
 
 class RoomService:
-    """
-    Service para gerenciar operações de salas.
-    """
+    """Service para gerenciar operações de salas."""
 
     @staticmethod
-    async def create_room(
-        name: str,
-        is_private: bool = False,
-        creator: Optional[User] = None
-    ) -> Room:
+    async def create_room(name: str, creator: User, is_private: bool = False) -> Room:
         """
-        Cria uma nova sala de chat.
+        Cria uma nova sala de chat com o criador como ADMIN.
 
         Args:
             name: Nome da sala
+            creator: Usuário criador (será ADMIN automaticamente)
             is_private: Se a sala é privada
-            creator: Usuário criador (será adicionado automaticamente)
 
         Returns:
             Room: Sala criada
         """
-        room = await Room.objects.acreate(
-            name=name,
-            is_private=is_private
-        )
-
-        if creator:
-            await room.participants.aadd(creator)
-
-        return room
+        async with transaction.atomic():
+            room = await Room.objects.acreate(name=name, is_private=is_private)
+            await RoomParticipant.objects.acreate(room=room, user=creator, role=RoomParticipant.Role.ADMIN)
+            return room
 
     @staticmethod
-    async def add_participant(room: Room, user: User) -> None:
+    async def add_participant(room: Room, new_user: User, requester: Optional[User] = None) -> RoomParticipant:
         """
-        Adiciona um participante à sala.
+        Adiciona um participante à sala com validação de permissões.
+
+        Em salas privadas, apenas ADMINs podem adicionar novos membros.
 
         Args:
             room: Sala para adicionar participante
-            user: Usuário a ser adicionado
+            new_user: Usuário a ser adicionado
+            requester: Usuário solicitante (obrigatório para salas privadas)
+
+        Returns:
+            RoomParticipant: Participação criada
+
+        Raises:
+            PermissionDenied: Se requester não é ADMIN em sala privada
         """
-        await room.participants.aadd(user)
+        if room.is_private:
+            if not requester:
+                raise PermissionDenied("Requester é obrigatório para salas privadas.")
+
+            is_admin = await RoomParticipant.objects.filter(
+                room=room, user=requester, role=RoomParticipant.Role.ADMIN
+            ).aexists()
+
+            if not is_admin:
+                raise PermissionDenied("Apenas administradores podem adicionar membros em salas privadas.")
+
+        participant, _ = await RoomParticipant.objects.aget_or_create(
+            room=room, user=new_user, defaults={"role": RoomParticipant.Role.MEMBER}
+        )
+        return participant
 
     @staticmethod
-    async def remove_participant(room: Room, user: User) -> None:
+    async def remove_participant(room: Room, user_to_remove: User, requester: Optional[User] = None) -> None:
         """
-        Remove um participante da sala.
+        Remove um participante da sala com validação de permissões.
+
+        Em salas privadas, apenas ADMINs podem remover membros.
 
         Args:
             room: Sala para remover participante
-            user: Usuário a ser removido
-        """
-        await room.participants.aremove(user)
+            user_to_remove: Usuário a ser removido
+            requester: Usuário solicitante (obrigatório para salas privadas)
 
+        Raises:
+            PermissionDenied: Se requester não é ADMIN em sala privada
+        """
+        if room.is_private:
+            if not requester:
+                raise PermissionDenied("Requester é obrigatório para salas privadas.")
+
+            is_admin = await RoomParticipant.objects.filter(
+                room=room, user=requester, role=RoomParticipant.Role.ADMIN
+            ).aexists()
+
+            if not is_admin:
+                raise PermissionDenied("Apenas administradores podem remover membros em salas privadas.")
+
+        await RoomParticipant.objects.filter(room=room, user=user_to_remove).adelete()
