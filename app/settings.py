@@ -164,6 +164,11 @@ RABBITMQ_PORT = config("RABBITMQ_PORT", default="5672")
 RABBITMQ_USER = config("RABBITMQ_DEFAULT_USER", default="moderated_chat_user")
 RABBITMQ_PASSWORD = config("RABBITMQ_DEFAULT_PASS")
 RABBITMQ_VHOST = config("RABBITMQ_VHOST", default="/")
+RABBITMQ_URL = f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@{RABBITMQ_HOST}:{RABBITMQ_PORT}{RABBITMQ_VHOST}"
+
+
+# Celery Configuration
+CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=RABBITMQ_URL)
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
