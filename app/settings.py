@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+from datetime import timedelta
 from pathlib import Path
 
 from decouple import Csv, config
@@ -37,6 +38,9 @@ LOCAL_APPS = [
 
 THIRD_PARTY_APPS = [
     "channels",
+    "rest_framework",
+    "rest_framework_simplejwt",
+    "drf_spectacular",
 ]
 
 INSTALLED_APPS = [
@@ -160,3 +164,39 @@ RABBITMQ_PORT = config("RABBITMQ_PORT", default="5672")
 RABBITMQ_USER = config("RABBITMQ_DEFAULT_USER", default="moderated_chat_user")
 RABBITMQ_PASSWORD = config("RABBITMQ_DEFAULT_PASS")
 RABBITMQ_VHOST = config("RABBITMQ_VHOST", default="/")
+
+# Django REST Framework Configuration
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.CursorPagination",
+    # "DEFAULT_PAGINATION_CLASS": "app.utils.pagination.CustomPageNumberPagination",
+    "PAGE_SIZE": 50,
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+# Simple JWT Configuration
+
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+# drf-spectacular (Swagger/OpenAPI) Configuration
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Moderated Chat API",
+    "DESCRIPTION": "API REST para o sistema de chat com moderação automática",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SWAGGER_UI_SETTINGS": {
+        "persistAuthorization": True,
+    },
+}

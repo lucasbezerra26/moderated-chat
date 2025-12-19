@@ -3,7 +3,6 @@ from typing import Optional
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
 from django.db.models import QuerySet
 
 from app.accounts.models import User
@@ -76,10 +75,9 @@ class RoomService:
         Returns:
             Room: Sala criada
         """
-        async with transaction.atomic():
-            room = await Room.objects.acreate(name=name, is_private=is_private)
-            await RoomParticipant.objects.acreate(room=room, user=creator, role=RoomParticipant.Role.ADMIN)
-            return room
+        room = await Room.objects.acreate(name=name, is_private=is_private)
+        await RoomParticipant.objects.acreate(room=room, user=creator, role=RoomParticipant.Role.ADMIN)
+        return room
 
     @staticmethod
     async def add_participant(room: Room, new_user: User, requester: Optional[User] = None) -> RoomParticipant:
