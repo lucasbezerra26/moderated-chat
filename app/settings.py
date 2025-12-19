@@ -29,7 +29,10 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='', cast=Csv())
 # Application definition
 
 LOCAL_APPS = [
-    'app.accounts'
+    'app.accounts',
+    'app.chat',
+    'app.moderation',
+
 ]
 
 THIRD_PARTY_APPS = []

@@ -17,4 +17,19 @@ dependencies = [
     "model-bakery>=1.20.0",
     "pytest-django>=4.9.0",
     "pytest-asyncio>=0.24.0",
+    "isort>=7.0.0",
+    "flake8>=7.3.0",
+    "pre-commit>=4.5.1",
 ]
+
+
+[tool.black]
+line-length = 119
+target-version = ['py311']
+exclude = '''/( \.git | \.venv | \.vscode | \.pytest_cache | \.env | env | venv | pyproject\.toml)/'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 119
+skip = [".env", "venv", "env", ".venv"]
