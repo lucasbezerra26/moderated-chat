@@ -20,9 +20,10 @@ class TestChatConsumer:
         communicator = WebsocketCommunicator(application, f"ws/chat/{room.id}/")
         communicator.scope["user"] = AnonymousUser()
 
-        connected, _ = await communicator.connect()
+        connected, close_code = await communicator.connect()
 
         assert connected is False
+        assert close_code == 4001
         await communicator.disconnect()
 
     async def test_consumer_rejects_invalid_room(self, user):
@@ -31,9 +32,10 @@ class TestChatConsumer:
         communicator = WebsocketCommunicator(application, f"ws/chat/{fake_room_id}/")
         communicator.scope["user"] = user
 
-        connected, _ = await communicator.connect()
+        connected, close_code = await communicator.connect()
 
         assert connected is False
+        assert close_code == 4004
         await communicator.disconnect()
 
     async def test_consumer_accepts_authenticated_user(self, user, room):
