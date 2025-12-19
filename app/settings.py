@@ -35,7 +35,9 @@ LOCAL_APPS = [
     "app.moderation",
 ]
 
-THIRD_PARTY_APPS = []
+THIRD_PARTY_APPS = [
+    "channels",
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -76,6 +78,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "app.wsgi.application"
+ASGI_APPLICATION = "app.asgi.application"
 
 
 AUTH_USER_MODEL = "accounts.User"
@@ -140,6 +143,16 @@ REDIS_HOST = config("REDIS_HOST", default="localhost")
 REDIS_PORT = config("REDIS_PORT", default="6379")
 REDIS_PASSWORD = config("REDIS_PASSWORD")
 REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
+
+# Django Channels Configuration
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+        },
+    },
+}
 
 # RabbitMQ Configuration
 RABBITMQ_HOST = config("RABBITMQ_HOST", default="localhost")

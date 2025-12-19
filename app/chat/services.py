@@ -1,5 +1,7 @@
 from typing import Optional
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import QuerySet
@@ -153,8 +155,6 @@ class BroadcastService:
         Args:
             message: Mensagem aprovada para broadcast
         """
-        from asgiref.sync import async_to_sync
-        from channels.layers import get_channel_layer
 
         channel_layer = get_channel_layer()
         room_group_name = f"chat_{message.room.id}"
@@ -186,9 +186,6 @@ class BroadcastService:
             message: Mensagem rejeitada
             details: Detalhes da rejeição
         """
-        from asgiref.sync import async_to_sync
-        from channels.layers import get_channel_layer
-
         channel_layer = get_channel_layer()
         user_channel_name = f"user_{message.author.id}"
 
