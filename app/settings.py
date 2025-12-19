@@ -173,8 +173,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.CursorPagination",
-    # "DEFAULT_PAGINATION_CLASS": "app.utils.pagination.CustomPageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "app.utils.pagination.CustomPageNumberPagination",
     "PAGE_SIZE": 50,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }

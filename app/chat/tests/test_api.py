@@ -80,7 +80,7 @@ class TestRoomViewSet:
         response = client.get("/api/chat/rooms/")
 
         assert response.status_code == status.HTTP_200_OK
-        room_ids = [r["id"] for r in response.data]
+        room_ids = [r["id"] for r in response.data["results"]]
         assert str(room_with_admin.id) in room_ids
         assert str(other_room.id) not in room_ids
 
@@ -169,7 +169,7 @@ class TestMessageViewSet:
         response = client.get(f"/api/chat/rooms/{room_with_admin.id}/messages/")
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data["results"]) == 50
+        assert len(response.data["results"]) == 20
         assert response.data["next"] is not None
 
     def test_list_messages_not_participant_fails(self, member_user: User, room_with_admin: Room) -> None:
@@ -179,4 +179,4 @@ class TestMessageViewSet:
 
         response = client.get(f"/api/chat/rooms/{room_with_admin.id}/messages/")
 
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code == status.HTTP_404_NOT_FOUND

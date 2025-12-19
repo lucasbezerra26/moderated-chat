@@ -1,13 +1,14 @@
-from django.shortcuts import get_object_or_404
+from asgiref.sync import async_to_sync
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import status, viewsets
+from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.pagination import CursorPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
 
 from app.accounts.models import User
+from app.chat.api.pagination import MessageCursorPagination
 from app.chat.api.permissions import IsRoomAdmin, IsRoomParticipant
 from app.chat.api.serializers import (
     AddParticipantSerializer,
@@ -20,68 +21,45 @@ from app.chat.models import Message, Room
 from app.chat.services import RoomService
 
 
-class MessageCursorPagination(CursorPagination):
-    """Paginação por cursor para mensagens (scroll infinito)."""
-
-    page_size = 50
-    ordering = "-created_at"
-    cursor_query_param = "cursor"
-
-
 @extend_schema_view(
     list=extend_schema(
         summary="Listar salas do usuário",
-        responses={200: RoomSerializer(many=True)},
         tags=["Rooms"],
     ),
     create=extend_schema(
         summary="Criar nova sala",
-        request=RoomCreateSerializer,
-        responses={201: RoomSerializer},
         tags=["Rooms"],
     ),
     retrieve=extend_schema(
         summary="Detalhes da sala",
-        responses={200: RoomSerializer},
         tags=["Rooms"],
     ),
 )
-class RoomViewSet(viewsets.ViewSet):
+class RoomViewSet(ModelViewSet):
     """ViewSet para gerenciamento de salas."""
 
     permission_classes = [IsAuthenticated]
     serializer_class = RoomSerializer
+    # pagination_class = RoomPagination
     lookup_field = "pk"
-    pagination_class = MessageCursorPagination
 
     def get_queryset(self):
-        return Room.objects.filter(participants=self.request.user)
-
-    def list(self, request: Request) -> Response:
-        """Lista salas do usuário autenticado."""
-        queryset = self.get_queryset().prefetch_related("memberships")
-        serializer = RoomSerializer(queryset, many=True)
-        return Response(serializer.data)
-
-    def create(self, request: Request) -> Response:
-        """Cria uma nova sala com o usuário como ADMIN."""
-        serializer = RoomCreateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        from asgiref.sync import async_to_sync
-
-        room = async_to_sync(RoomService.create_room)(
-            name=serializer.validated_data["name"],
-            creator=request.user,
-            is_private=serializer.validated_data.get("is_private", False),
+        return (
+            Room.objects.filter(participants=self.request.user).prefetch_related("memberships").order_by("-created_at")
         )
 
-        return Response(RoomSerializer(room).data, status=status.HTTP_201_CREATED)
+    def get_serializer_class(self):
+        if self.action == "create":
+            return RoomCreateSerializer
+        return RoomSerializer
 
-    def retrieve(self, request: Request, pk=None) -> Response:
-        """Retorna detalhes de uma sala."""
-        room = get_object_or_404(self.get_queryset(), pk=pk)
-        return Response(RoomSerializer(room).data)
+    def perform_create(self, serializer):
+        room = async_to_sync(RoomService.create_room)(
+            name=serializer.validated_data["name"],
+            creator=self.request.user,
+            is_private=serializer.validated_data.get("is_private", False),
+        )
+        serializer.instance = room
 
     @extend_schema(
         summary="Adicionar participante à sala",
@@ -97,17 +75,19 @@ class RoomViewSet(viewsets.ViewSet):
     )
     def add_participant(self, request: Request, pk=None) -> Response:
         """Adiciona um participante à sala (apenas ADMIN em salas privadas)."""
-        room = get_object_or_404(Room, pk=pk)
-        self.check_object_permissions(request, room)
+        room = self.get_object()
 
         serializer = AddParticipantSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        new_user = get_object_or_404(User, pk=serializer.validated_data["user_id"])
+        user = User.objects.filter(pk=serializer.validated_data["user_id"]).first()
+        if not user:
+            return Response(
+                {"detail": "Usuário não encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
-        from asgiref.sync import async_to_sync
-
-        participant = async_to_sync(RoomService.add_participant)(room=room, new_user=new_user, requester=request.user)
+        participant = async_to_sync(RoomService.add_participant)(room=room, new_user=user, requester=request.user)
 
         return Response(
             RoomParticipantSerializer(participant).data,
@@ -126,12 +106,14 @@ class RoomViewSet(viewsets.ViewSet):
     )
     def remove_participant(self, request: Request, pk=None, user_id=None) -> Response:
         """Remove um participante da sala (apenas ADMIN em salas privadas)."""
-        room = get_object_or_404(Room, pk=pk)
-        self.check_object_permissions(request, room)
+        room = self.get_object()
 
-        user_to_remove = get_object_or_404(User, pk=user_id)
-
-        from asgiref.sync import async_to_sync
+        user_to_remove = User.objects.filter(pk=user_id).first()
+        if not user_to_remove:
+            return Response(
+                {"detail": "Usuário não encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         async_to_sync(RoomService.remove_participant)(room=room, user_to_remove=user_to_remove, requester=request.user)
 
@@ -150,8 +132,7 @@ class RoomViewSet(viewsets.ViewSet):
     )
     def messages(self, request: Request, pk=None) -> Response:
         """Lista mensagens aprovadas da sala com paginação por cursor."""
-        room = get_object_or_404(Room, pk=pk)
-        self.check_object_permissions(request, room)
+        room = self.get_object()
 
         queryset = (
             Message.objects.filter(room=room, status=Message.Status.APPROVED)
