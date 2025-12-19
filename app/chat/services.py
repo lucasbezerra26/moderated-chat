@@ -3,7 +3,6 @@ from typing import Optional
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.core.exceptions import PermissionDenied
-from django.db.models import QuerySet
 
 from app.accounts.models import User
 from app.chat.models import Message, Room, RoomParticipant
@@ -12,7 +11,7 @@ from app.chat.models import Message, Room, RoomParticipant
 class MessageService:
     """
     Service para gerenciar operação de mensagens.
-    Responsável por criar mensagens em estado PENDING e buscar histórico.
+    Responsável por criar mensagens em estado PENDING
     """
 
     @staticmethod
@@ -37,26 +36,6 @@ class MessageService:
         moderate_message_task.delay(str(message.id))
 
         return message
-
-    @staticmethod
-    async def get_room_messages(room: Room, status: Optional[str] = None, limit: int = 50) -> QuerySet[Message]:
-        """
-        Busca mensagens de uma sala com filtros opcionais.
-
-        Args:
-            room: Sala para buscar mensagens
-            status: Filtro opcional por status (PENDING/APPROVED/REJECTED)
-            limit: Limite de mensagens a retornar
-
-        Returns:
-            QuerySet[Message]: QuerySet de mensagens
-        """
-        queryset = Message.objects.filter(room=room).select_related("author")
-
-        if status:
-            queryset = queryset.filter(status=status)
-
-        return queryset.order_by("-created_at")[:limit]
 
 
 class RoomService:

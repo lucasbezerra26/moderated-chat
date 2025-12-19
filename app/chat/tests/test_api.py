@@ -5,6 +5,7 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from app.accounts.models import User
+from app.chat.api.pagination import MessageCursorPagination
 from app.chat.models import Message, Room, RoomParticipant
 
 
@@ -169,7 +170,7 @@ class TestMessageViewSet:
         response = client.get(f"/api/chat/rooms/{room_with_admin.id}/messages/")
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data["results"]) == 20
+        assert len(response.data["results"]) == MessageCursorPagination.page_size
         assert response.data["next"] is not None
 
     def test_list_messages_not_participant_fails(self, member_user: User, room_with_admin: Room) -> None:
