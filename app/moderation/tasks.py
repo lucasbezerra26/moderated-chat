@@ -1,11 +1,10 @@
 import uuid
 
-from asgiref.sync import async_to_sync
 from celery import shared_task
-from channels.layers import get_channel_layer
 from django.db import transaction
 
 from app.chat.models import Message
+from app.chat.services import BroadcastService
 from app.moderation.models import ModerationLog
 from app.moderation.services import ModerationService
 
@@ -51,9 +50,9 @@ def moderate_message_task(self, message_id: str) -> dict:
             message.save(update_fields=["status", "updated_at"])
 
         if message.status == Message.Status.APPROVED:
-            _broadcast_message_to_room(message)
+            BroadcastService.broadcast_message_to_room(message)
         elif message.status == Message.Status.REJECTED:
-            _notify_author_rejection(message, moderation_result.get("details", {}))
+            BroadcastService.notify_author_rejection(message, moderation_result.get("details", {}))
 
         return {
             "status": "success",
@@ -66,53 +65,3 @@ def moderate_message_task(self, message_id: str) -> dict:
         return {"status": "error", "reason": "Message not found", "message_id": message_id}
     except Exception as exc:
         raise self.retry(exc=exc)
-
-
-def _broadcast_message_to_room(message: Message) -> None:
-    """
-    Envia mensagem aprovada para todos os participantes da sala via WebSocket.
-
-    Args:
-        message: Mensagem aprovada para broadcast
-    """
-    channel_layer = get_channel_layer()
-    room_group_name = f"chat_{message.room.id}"
-
-    async_to_sync(channel_layer.group_send)(
-        room_group_name,
-        {
-            "type": "chat_message",
-            "message": {
-                "id": str(message.id),
-                "content": message.content,
-                "author": {"id": str(message.author.id), "name": message.author.name, "email": message.author.email},
-                "status": message.status,
-                "created_at": message.created_at.isoformat(),
-            },
-        },
-    )
-
-
-def _notify_author_rejection(message: Message, details: dict) -> None:
-    """
-    Notifica o autor que sua mensagem foi rejeitada via WebSocket privado.
-
-    Args:
-        message: Mensagem rejeitada
-        details: Detalhes da rejeição
-    """
-    channel_layer = get_channel_layer()
-    user_channel_name = f"user_{message.author.id}"
-
-    async_to_sync(channel_layer.group_send)(
-        user_channel_name,
-        {
-            "type": "message_rejected",
-            "message": {
-                "id": str(message.id),
-                "content": message.content,
-                "reason": details.get("reason", "content_violation"),
-                "created_at": message.created_at.isoformat(),
-            },
-        },
-    )
