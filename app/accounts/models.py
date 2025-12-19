@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, UserManager
 from django.db import models
+
 from app.utils.models import BaseModel
+
 
 class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     name = models.CharField("Nome", max_length=500)
@@ -17,10 +19,6 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     class Meta:
         verbose_name = "Usuário"
         verbose_name_plural = "Usuários"
-
-        permissions = [
-            ("can_access_report", "Pode acessar os relatórios do Power BI"),
-        ]
 
     def __str__(self):
         return self.name

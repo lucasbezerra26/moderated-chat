@@ -1,4 +1,5 @@
-from typing import Dict, Literal
+from typing import Dict
+
 from app.chat.models import Message
 
 
@@ -37,18 +38,12 @@ class ModerationService:
                     "verdict": Message.Status.REJECTED,
                     "provider": "local_dictionary",
                     "score": 1.0,
-                    "details": {
-                        "reason": "profanity_detected",
-                        "matched_word": word
-                    }
+                    "details": {"reason": "profanity_detected", "matched_word": word},
                 }
 
         return {
             "verdict": Message.Status.APPROVED,
             "provider": "local_dictionary",
             "score": 1.0,
-            "details": {
-                "reason": "clean_content"
-            }
+            "details": {"reason": "clean_content"},
         }
-
