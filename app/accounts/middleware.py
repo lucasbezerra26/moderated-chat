@@ -30,11 +30,9 @@ class JwtAuthMiddleware:
         self.inner = inner
 
     async def __call__(self, scope, receive, send):
-        # Pega a query string (bytes) e decodifica
         query_string = scope.get("query_string", b"").decode("utf-8")
         query_params = parse_qs(query_string)
 
-        # Pega o parâmetro 'token'
         token = query_params.get("token", [None])[0]
 
         if token:

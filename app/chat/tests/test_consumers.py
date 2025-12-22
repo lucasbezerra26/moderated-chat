@@ -4,10 +4,16 @@ from unittest.mock import patch
 import pytest
 from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
-from django.contrib.auth.models import AnonymousUser
+from rest_framework_simplejwt.tokens import AccessToken
 
 from app.asgi import application
 from app.chat.models import Message
+
+
+@pytest.fixture
+def user_token(user):
+    """Gera um token JWT para o usuário de teste."""
+    return str(AccessToken.for_user(user))
 
 
 @pytest.mark.integration
@@ -18,7 +24,7 @@ class TestChatConsumer:
     async def test_consumer_rejects_unauthenticated_user(self, room):
         """Verifica que usuários não autenticados recebem close code 4001."""
         communicator = WebsocketCommunicator(application, f"ws/chat/{room.id}/")
-        communicator.scope["user"] = AnonymousUser()
+        # Sem token na query string, o middleware define AnonymousUser
 
         connected, close_code = await communicator.connect()
 
@@ -26,11 +32,10 @@ class TestChatConsumer:
         assert close_code == 4001
         await communicator.disconnect()
 
-    async def test_consumer_rejects_invalid_room(self, user):
+    async def test_consumer_rejects_invalid_room(self, user, user_token):
         """Verifica que sala inexistente resulta em close code 4004."""
         fake_room_id = uuid.uuid4()
-        communicator = WebsocketCommunicator(application, f"ws/chat/{fake_room_id}/")
-        communicator.scope["user"] = user
+        communicator = WebsocketCommunicator(application, f"ws/chat/{fake_room_id}/?token={user_token}")
 
         connected, close_code = await communicator.connect()
 
@@ -38,10 +43,9 @@ class TestChatConsumer:
         assert close_code == 4004
         await communicator.disconnect()
 
-    async def test_consumer_accepts_authenticated_user(self, user, room):
+    async def test_consumer_accepts_authenticated_user(self, user, room, user_token):
         """Verifica conexão bem-sucedida e mensagem connection_established."""
-        communicator = WebsocketCommunicator(application, f"ws/chat/{room.id}/")
-        communicator.scope["user"] = user
+        communicator = WebsocketCommunicator(application, f"ws/chat/{room.id}/?token={user_token}")
 
         connected, _ = await communicator.connect()
         assert connected is True
@@ -52,10 +56,9 @@ class TestChatConsumer:
 
         await communicator.disconnect()
 
-    async def test_consumer_handles_empty_message(self, user, room):
+    async def test_consumer_handles_empty_message(self, user, room, user_token):
         """Verifica resposta de erro para mensagem vazia."""
-        communicator = WebsocketCommunicator(application, f"ws/chat/{room.id}/")
-        communicator.scope["user"] = user
+        communicator = WebsocketCommunicator(application, f"ws/chat/{room.id}/?token={user_token}")
 
         await communicator.connect()
         await communicator.receive_json_from()
@@ -68,10 +71,9 @@ class TestChatConsumer:
 
         await communicator.disconnect()
 
-    async def test_consumer_handles_unknown_message_type(self, user, room):
+    async def test_consumer_handles_unknown_message_type(self, user, room, user_token):
         """Verifica resposta de erro para tipo de mensagem desconhecido."""
-        communicator = WebsocketCommunicator(application, f"ws/chat/{room.id}/")
-        communicator.scope["user"] = user
+        communicator = WebsocketCommunicator(application, f"ws/chat/{room.id}/?token={user_token}")
 
         await communicator.connect()
         await communicator.receive_json_from()
@@ -85,10 +87,9 @@ class TestChatConsumer:
         await communicator.disconnect()
 
     @patch("app.moderation.tasks.moderate_message_task.delay")
-    async def test_consumer_queues_message_and_triggers_moderation(self, mock_task, user, room):
+    async def test_consumer_queues_message_and_triggers_moderation(self, mock_task, user, room, user_token):
         """Verifica message_queued e chamada do Celery (mockado)."""
-        communicator = WebsocketCommunicator(application, f"ws/chat/{room.id}/")
-        communicator.scope["user"] = user
+        communicator = WebsocketCommunicator(application, f"ws/chat/{room.id}/?token={user_token}")
 
         await communicator.connect()
         await communicator.receive_json_from()
@@ -108,10 +109,9 @@ class TestChatConsumer:
 
         await communicator.disconnect()
 
-    async def test_consumer_receives_broadcast_on_approval(self, user, room):
+    async def test_consumer_receives_broadcast_on_approval(self, user, room, user_token):
         """Verifica recebimento de chat_message via channel layer."""
-        communicator = WebsocketCommunicator(application, f"ws/chat/{room.id}/")
-        communicator.scope["user"] = user
+        communicator = WebsocketCommunicator(application, f"ws/chat/{room.id}/?token={user_token}")
 
         await communicator.connect()
         await communicator.receive_json_from()
@@ -139,10 +139,9 @@ class TestChatConsumer:
 
         await communicator.disconnect()
 
-    async def test_consumer_receives_rejection_notification(self, user, room):
+    async def test_consumer_receives_rejection_notification(self, user, room, user_token):
         """Verifica recebimento de message_rejected no canal do usuário."""
-        communicator = WebsocketCommunicator(application, f"ws/chat/{room.id}/")
-        communicator.scope["user"] = user
+        communicator = WebsocketCommunicator(application, f"ws/chat/{room.id}/?token={user_token}")
 
         await communicator.connect()
         await communicator.receive_json_from()
