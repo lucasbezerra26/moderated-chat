@@ -40,7 +40,6 @@ class RoomViewSet(ModelViewSet):
 
     permission_classes = [IsAuthenticated]
     serializer_class = RoomSerializer
-    # pagination_class = RoomPagination
     lookup_field = "pk"
 
     def get_queryset(self):
