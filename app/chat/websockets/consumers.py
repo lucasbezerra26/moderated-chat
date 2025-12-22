@@ -1,11 +1,14 @@
 import json
 from typing import Any, Dict
 
+import structlog
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 from app.chat.models import Room
 from app.chat.services import MessageService
+
+logger = structlog.get_logger(__name__)
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -28,12 +31,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.room_group_name = f"chat_{self.room_id}"
         self.user = self.scope["user"]
 
+        log = logger.bind(user_id=str(getattr(self.user, "id", "anon")), room_id=self.room_id)
+
         if not self.user.is_authenticated:
+            log.warning("ws_connection_unauthenticated")
             await self.close(code=4001)
             return
 
         room_exists = await self._check_room_exists()
         if not room_exists:
+            log.warning("ws_connection_room_not_found")
             await self.close(code=4004)
             return
 
@@ -43,6 +50,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_add(user_channel_name, self.channel_name)
 
         await self.accept()
+        log.info("ws_connected")
 
         await self.send(
             text_data=json.dumps({"type": "connection_established", "message": f"Conectado à sala {self.room_id}"})
@@ -62,6 +70,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             user_channel_name = f"user_{self.user.id}"
             await self.channel_layer.group_discard(user_channel_name, self.channel_name)
 
+        logger.info("ws_disconnected", user_id=str(getattr(self.user, "id", "anon")), close_code=close_code)
+
     async def receive(self, text_data: str) -> None:
         """
         Recebe mensagem do cliente, valida e envia para moderação.
@@ -69,6 +79,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         Args:
             text_data: Mensagem JSON do cliente
         """
+        log = logger.bind(user_id=str(self.user.id), room_id=self.room_id)
         try:
             data = json.loads(text_data)
             message_type = data.get("type")
@@ -76,6 +87,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if message_type == "chat_message":
                 await self._handle_chat_message(data)
             else:
+                log.warning("ws_unknown_message_type", type=message_type)
                 await self.send(
                     text_data=json.dumps(
                         {"type": "error", "message": f"Tipo de mensagem desconhecido: {message_type}"}
@@ -83,8 +95,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 )
 
         except json.JSONDecodeError:
+            log.warning("ws_invalid_json")
             await self.send(text_data=json.dumps({"type": "error", "message": "JSON inválido"}))
         except Exception as e:
+            log.exception("ws_receive_error")
             await self.send(
                 text_data=json.dumps({"type": "error", "message": f"Erro ao processar mensagem: {str(e)}"})
             )
@@ -104,6 +118,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         room = await self._get_room()
         message = await MessageService.create_message(room=room, author=self.user, content=content)
+
+        logger.info("ws_message_queued", message_id=str(message.id), user_id=str(self.user.id))
 
         await self.send(
             text_data=json.dumps(

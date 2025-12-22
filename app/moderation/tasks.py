@@ -1,5 +1,6 @@
 import uuid
 
+import structlog
 from celery import shared_task
 from django.db import transaction
 
@@ -7,6 +8,8 @@ from app.chat.models import Message
 from app.chat.services import BroadcastService
 from app.moderation.models import ModerationLog
 from app.moderation.services import ModerationService
+
+logger = structlog.get_logger(__name__)
 
 
 @shared_task(
@@ -25,6 +28,7 @@ def moderate_message_task(self, message_id: str) -> dict:
     Returns:
         dict: Resultado da moderação com status e detalhes
     """
+    log = logger.bind(message_id=message_id, task_id=self.request.id)
     try:
         message_uuid = uuid.UUID(message_id)
 
@@ -34,8 +38,10 @@ def moderate_message_task(self, message_id: str) -> dict:
             )
 
             if message.status != Message.Status.PENDING:
+                log.info("moderation_skipped", current_status=message.status)
                 return {"status": "skipped", "reason": f"Message already {message.status}", "message_id": message_id}
 
+            log.info("starting_moderation", content=message.content[:50])
             moderation_result = ModerationService.moderate(message.content)
 
             ModerationLog.objects.create(
@@ -50,8 +56,10 @@ def moderate_message_task(self, message_id: str) -> dict:
             message.save(update_fields=["status", "updated_at"])
 
         if message.status == Message.Status.APPROVED:
+            log.info("message_approved")
             BroadcastService.broadcast_message_to_room(message)
         elif message.status == Message.Status.REJECTED:
+            log.info("message_rejected", reason=moderation_result.get("details", {}).get("reason"))
             BroadcastService.notify_author_rejection(message, moderation_result.get("details", {}))
 
         return {
@@ -62,6 +70,8 @@ def moderate_message_task(self, message_id: str) -> dict:
         }
 
     except Message.DoesNotExist:
+        log.error("message_not_found")
         return {"status": "error", "reason": "Message not found", "message_id": message_id}
     except Exception as exc:
+        log.exception("moderation_task_failed", retry_count=self.request.retries)
         raise self.retry(exc=exc)
