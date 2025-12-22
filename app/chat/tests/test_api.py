@@ -102,7 +102,7 @@ class TestRoomViewSet:
         assert RoomParticipant.objects.filter(room=private_room_with_admin, user=member_user).exists()
 
     def test_add_participant_as_member_fails(
-        self, admin_user: User, member_user: User, private_room_with_admin: Room, db
+        self, admin_user: User, member_user: User, private_room_with_admin: Room
     ) -> None:
         baker.make(
             RoomParticipant,
@@ -150,7 +150,32 @@ class TestMessageViewSet:
         assert response.status_code == status.HTTP_200_OK
         message_ids = [m["id"] for m in response.data["results"]]
         assert str(approved.id) in message_ids
-        assert str(pending.id) not in message_ids
+        assert str(pending.id) in message_ids
+        assert str(rejected.id) in message_ids
+
+    def test_list_messages_other_user_only_approved(
+        self, admin_user: User, member_user: User, room_with_admin: Room, db
+    ) -> None:
+        """Garante que mensagens de OUTROS usuários só apareçam se aprovadas."""
+        # Adiciona o member_user à sala
+        baker.make(RoomParticipant, room=room_with_admin, user=member_user, role=RoomParticipant.Role.MEMBER)
+
+        approved = baker.make(
+            Message, room=room_with_admin, author=admin_user, content="Approved", status=Message.Status.APPROVED
+        )
+        rejected = baker.make(
+            Message, room=room_with_admin, author=admin_user, content="Rejected", status=Message.Status.REJECTED
+        )
+
+        client = APIClient()
+        refresh = RefreshToken.for_user(member_user)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+
+        response = client.get(f"/api/chat/rooms/{room_with_admin.id}/messages/")
+
+        assert response.status_code == status.HTTP_200_OK
+        message_ids = [m["id"] for m in response.data["results"]]
+        assert str(approved.id) in message_ids
         assert str(rejected.id) not in message_ids
 
     def test_list_messages_with_pagination(self, admin_user: User, room_with_admin: Room, db) -> None:

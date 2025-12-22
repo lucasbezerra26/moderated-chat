@@ -1,4 +1,5 @@
 from asgiref.sync import async_to_sync
+from django.db.models import Q
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
@@ -130,11 +131,16 @@ class RoomViewSet(ModelViewSet):
         permission_classes=[IsAuthenticated, IsRoomParticipant],
     )
     def messages(self, request: Request, pk=None) -> Response:
-        """Lista mensagens aprovadas da sala com paginação por cursor."""
+        """Lista mensagens da sala com paginação por cursor.
+
+        Retorna:
+        - Todas as mensagens com status APPROVED.
+        - Mensagens do próprio usuário (mesmo se PENDING ou REJECTED).
+        """
         room = self.get_object()
 
         queryset = (
-            Message.objects.filter(room=room, status=Message.Status.APPROVED)
+            Message.objects.filter(Q(room=room), Q(status=Message.Status.APPROVED) | Q(author=request.user))
             .select_related("author")
             .order_by("-created_at")
         )
