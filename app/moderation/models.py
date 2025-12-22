@@ -1,12 +1,11 @@
 from django.db import models
 
-from app.chat.models import Message
 from app.utils.models import BaseModel
 
 
 class ModerationLog(BaseModel):
     message = models.ForeignKey(
-        Message, on_delete=models.CASCADE, related_name="moderation_logs", verbose_name="Mensagem"
+        "chat.Message", on_delete=models.CASCADE, related_name="moderation_logs", verbose_name="Mensagem"
     )
     provider = models.CharField("Provedor", max_length=50, help_text="Ex: local_dictionary, openai, azure")
     verdict = models.CharField("Veredicto", max_length=20, help_text="Ex: APPROVED, REJECTED")

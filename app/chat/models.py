@@ -30,8 +30,8 @@ class RoomParticipant(BaseModel):
         ADMIN = "ADMIN", "Administrador"
         MEMBER = "MEMBER", "Membro"
 
-    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="memberships")
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="room_participations")
+    room = models.ForeignKey("chat.Room", on_delete=models.CASCADE, related_name="memberships")
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="room_participations")
     role = models.CharField("Função", max_length=20, choices=Role.choices, default=Role.MEMBER)
 
     class Meta:
@@ -53,9 +53,9 @@ class Message(BaseModel):
         APPROVED = "APPROVED", "Aprovada"
         REJECTED = "REJECTED", "Rejeitada"
 
-    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="messages", verbose_name="Sala")
+    room = models.ForeignKey("chat.Room", on_delete=models.CASCADE, related_name="messages", verbose_name="Sala")
     author = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="messages", verbose_name="Autor"
+        "accounts.User", on_delete=models.CASCADE, related_name="messages", verbose_name="Autor"
     )
     content = models.TextField("Conteúdo")
     status = models.CharField("Status", max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
