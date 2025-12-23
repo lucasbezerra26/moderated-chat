@@ -42,7 +42,7 @@ class RoomService:
     """Service para gerenciar operações de salas."""
 
     @staticmethod
-    async def create_room(name: str, creator: User, is_private: bool = False) -> Room:
+    def create_room(name: str, creator: User, is_private: bool = False) -> Room:
         """
         Cria uma nova sala de chat com o criador como ADMIN.
 
@@ -54,12 +54,12 @@ class RoomService:
         Returns:
             Room: Sala criada
         """
-        room = await Room.objects.acreate(name=name, is_private=is_private)
-        await RoomParticipant.objects.acreate(room=room, user=creator, role=RoomParticipant.Role.ADMIN)
+        room = Room.objects.create(name=name, is_private=is_private)
+        RoomParticipant.objects.create(room=room, user=creator, role=RoomParticipant.Role.ADMIN)
         return room
 
     @staticmethod
-    async def add_participant(room: Room, new_user: User, requester: Optional[User] = None) -> RoomParticipant:
+    def add_participant(room: Room, new_user: User, requester: Optional[User] = None) -> RoomParticipant:
         """
         Adiciona um participante à sala com validação de permissões.
 
@@ -80,14 +80,14 @@ class RoomService:
             if not requester:
                 raise PermissionDenied("Requester é obrigatório para salas privadas.")
 
-            is_admin = await RoomParticipant.objects.filter(
+            is_admin = RoomParticipant.objects.filter(
                 room=room, user=requester, role=RoomParticipant.Role.ADMIN
-            ).aexists()
+            ).exists()
 
             if not is_admin:
                 raise PermissionDenied("Apenas administradores podem adicionar membros em salas privadas.")
 
-        participant, _ = await RoomParticipant.objects.aget_or_create(
+        participant, _ = RoomParticipant.objects.get_or_create(
             room=room, user=new_user, defaults={"role": RoomParticipant.Role.MEMBER}
         )
         return participant

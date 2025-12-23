@@ -13,6 +13,17 @@ class AuthorSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class RoomParticipantSerializer(serializers.ModelSerializer):
+    """Serializer para participantes da sala."""
+
+    user = AuthorSerializer(read_only=True)
+
+    class Meta:
+        model = RoomParticipant
+        fields = ["user", "role", "created_at"]
+        read_only_fields = fields
+
+
 class RoomSerializer(serializers.ModelSerializer):
     """Serializer para leitura de salas."""
 
@@ -27,22 +38,21 @@ class RoomSerializer(serializers.ModelSerializer):
         return obj.memberships.count()
 
 
+class RoomDetailSerializer(RoomSerializer):
+    """Serializer detalhado para salas, inclui participantes."""
+
+    participants = RoomParticipantSerializer(source="memberships", many=True, read_only=True)
+
+    class Meta(RoomSerializer.Meta):
+        fields = RoomSerializer.Meta.fields + ["participants"]
+
+
 class RoomCreateSerializer(serializers.Serializer):
     """Serializer para criação de salas."""
 
+    id = serializers.UUIDField(read_only=True)
     name = serializers.CharField(max_length=255)
     is_private = serializers.BooleanField(default=False)
-
-
-class RoomParticipantSerializer(serializers.ModelSerializer):
-    """Serializer para participantes da sala."""
-
-    user = AuthorSerializer(read_only=True)
-
-    class Meta:
-        model = RoomParticipant
-        fields = ["user", "role", "created_at"]
-        read_only_fields = fields
 
 
 class AddParticipantSerializer(serializers.Serializer):

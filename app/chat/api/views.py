@@ -1,4 +1,3 @@
-from asgiref.sync import async_to_sync
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
@@ -15,6 +14,7 @@ from app.chat.api.serializers import (
     AddParticipantSerializer,
     MessageSerializer,
     RoomCreateSerializer,
+    RoomDetailSerializer,
     RoomParticipantSerializer,
     RoomSerializer,
 )
@@ -25,15 +25,12 @@ from app.chat.services import RoomService
 @extend_schema_view(
     list=extend_schema(
         summary="Listar salas do usuário",
-        tags=["Rooms"],
     ),
     create=extend_schema(
         summary="Criar nova sala",
-        tags=["Rooms"],
     ),
     retrieve=extend_schema(
         summary="Detalhes da sala",
-        tags=["Rooms"],
     ),
 )
 class RoomViewSet(ModelViewSet):
@@ -51,10 +48,12 @@ class RoomViewSet(ModelViewSet):
     def get_serializer_class(self):
         if self.action == "create":
             return RoomCreateSerializer
+        if self.action == "retrieve":
+            return RoomDetailSerializer
         return RoomSerializer
 
     def perform_create(self, serializer):
-        room = async_to_sync(RoomService.create_room)(
+        room = RoomService.create_room(
             name=serializer.validated_data["name"],
             creator=self.request.user,
             is_private=serializer.validated_data.get("is_private", False),
@@ -65,7 +64,6 @@ class RoomViewSet(ModelViewSet):
         summary="Adicionar participante à sala",
         request=AddParticipantSerializer,
         responses={201: RoomParticipantSerializer},
-        tags=["Rooms"],
     )
     @action(
         detail=True,
@@ -87,7 +85,7 @@ class RoomViewSet(ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        participant = async_to_sync(RoomService.add_participant)(room=room, new_user=user, requester=request.user)
+        participant = RoomService.add_participant(room=room, new_user=user, requester=request.user)
 
         return Response(
             RoomParticipantSerializer(participant).data,
@@ -96,7 +94,6 @@ class RoomViewSet(ModelViewSet):
 
     @extend_schema(
         summary="Remover participante da sala",
-        tags=["Rooms"],
     )
     @action(
         detail=True,
@@ -115,7 +112,7 @@ class RoomViewSet(ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        async_to_sync(RoomService.remove_participant)(room=room, user_to_remove=user_to_remove, requester=request.user)
+        RoomService.remove_participant(room=room, user_to_remove=user_to_remove, requester=request.user)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 

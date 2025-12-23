@@ -20,7 +20,6 @@ class RegisterView(APIView):
         summary="Registrar novo usuário",
         request=RegisterSerializer,
         responses={201: UserSerializer},
-        tags=["Auth"],
     )
     def post(self, request: Request) -> Response:
         serializer = RegisterSerializer(data=request.data)
@@ -45,11 +44,9 @@ class RegisterView(APIView):
     list=extend_schema(
         summary="Listar usuários",
         description="Lista todos os usuários do sistema para permitir a adição de participantes em salas.",
-        tags=["Users"],
     ),
     retrieve=extend_schema(
         summary="Detalhes do usuário",
-        tags=["Users"],
     ),
 )
 class UserViewSet(ReadOnlyModelViewSet):
