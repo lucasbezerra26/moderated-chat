@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from model_bakery import baker
@@ -54,23 +54,28 @@ class TestModerationTaskIntegration:
         room = baker.make(Room)
         message = baker.make(Message, room=room, author=user, content="Safe message", status=Message.Status.PENDING)
 
-        with patch("app.moderation.infrastructure.gemini.GeminiModerator.moderate") as mock_gemini:
-            mock_gemini.return_value = ModerationResult(
-                verdict="APPROVED", provider="google_gemini", score=1.0, details={"reason": "clean_content"}
-            )
+        mock_moderator_instance = MagicMock()
+        mock_moderator_instance.moderate.return_value = ModerationResult(
+            verdict="APPROVED", provider="google_gemini", score=1.0, details={"reason": "clean_content"}
+        )
 
-            with patch(
-                "app.chat.services.broadcast_service.BroadcastService.broadcast_message_to_room"
-            ) as mock_broadcast:
-                result = moderate_message_task(str(message.id))
+        mock_gemini_class = MagicMock(return_value=mock_moderator_instance)
 
-                message.refresh_from_db()
-                assert message.status == Message.Status.APPROVED
-                assert result["status"] == "success"
-                assert result["verdict"] == Message.Status.APPROVED
-                assert result["provider"] == "google_gemini"
-                mock_broadcast.assert_called_once()
-                assert ModerationLog.objects.filter(message=message).exists()
+        with (
+            patch.dict(
+                "app.moderation.services.moderator.ModerationService._STRATEGIES", {"gemini": mock_gemini_class}
+            ),
+            patch("app.chat.services.broadcast_service.BroadcastService.broadcast_message_to_room") as mock_broadcast,
+        ):
+            result = moderate_message_task(str(message.id))
+
+            message.refresh_from_db()
+            assert message.status == Message.Status.APPROVED
+            assert result["status"] == "success"
+            assert result["verdict"] == Message.Status.APPROVED
+            assert result["provider"] == "google_gemini"
+            mock_broadcast.assert_called_once()
+            assert ModerationLog.objects.filter(message=message).exists()
 
     def test_moderate_message_task_rejected_gemini(self, db, settings):
         settings.MODERATION_PROVIDER = "gemini"
@@ -81,26 +86,33 @@ class TestModerationTaskIntegration:
             Message, room=room, author=user, content="Mensagem ofensiva", status=Message.Status.PENDING
         )
 
-        with patch("app.moderation.infrastructure.gemini.GeminiModerator.moderate") as mock_gemini:
-            mock_gemini.return_value = ModerationResult(
-                verdict="REJECTED",
-                provider="google_gemini",
-                score=1.0,
-                details={"reason": "Conteúdo contém discurso de ódio"},
-            )
+        mock_moderator_instance = MagicMock()
+        mock_moderator_instance.moderate.return_value = ModerationResult(
+            verdict="REJECTED",
+            provider="google_gemini",
+            score=1.0,
+            details={"reason": "Conteúdo contém discurso de ódio"},
+        )
 
-            with patch("app.chat.services.broadcast_service.BroadcastService.notify_author_rejection") as mock_notify:
-                result = moderate_message_task(str(message.id))
+        mock_gemini_class = MagicMock(return_value=mock_moderator_instance)
 
-                message.refresh_from_db()
-                assert message.status == Message.Status.REJECTED
-                assert result["verdict"] == Message.Status.REJECTED
-                assert result["provider"] == "google_gemini"
-                mock_notify.assert_called_once()
+        with (
+            patch.dict(
+                "app.moderation.services.moderator.ModerationService._STRATEGIES", {"gemini": mock_gemini_class}
+            ),
+            patch("app.chat.services.broadcast_service.BroadcastService.notify_author_rejection") as mock_notify,
+        ):
+            result = moderate_message_task(str(message.id))
 
-                call_args = mock_notify.call_args
-                assert call_args[0][0] == message
-                assert "reason" in call_args[0][1]
+            message.refresh_from_db()
+            assert message.status == Message.Status.REJECTED
+            assert result["verdict"] == Message.Status.REJECTED
+            assert result["provider"] == "google_gemini"
+            mock_notify.assert_called_once()
+
+            call_args = mock_notify.call_args
+            assert call_args[0][0] == message
+            assert "reason" in call_args[0][1]
 
     def test_moderate_message_task_idempotency(self, db):
         user = baker.make(User)

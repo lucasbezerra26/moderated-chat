@@ -57,9 +57,3 @@ def use_in_memory_channel_layer(settings):
             "BACKEND": "channels.layers.InMemoryChannelLayer",
         },
     }
-
-
-@pytest.fixture(autouse=True)
-def mock_gemini_moderation(settings):
-    """Mock do Google Gemini para testes quando o provider é gemini."""
-    settings.MODERATION_PROVIDER = "local"
