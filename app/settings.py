@@ -185,8 +185,8 @@ GOOGLE_API_KEY = config("GOOGLE_API_KEY", default="")
 GEMINI_MODEL = config("GEMINI_MODEL", default="gemini-2.0-flash-exp")
 PROFANITY_LIST = config(
     "PROFANITY_LIST",
-    default=["bobo", "idiota", "estupido"],
-    cast=list,
+    default="bobo,idiota,estupido",
+    cast=Csv(),
 )
 
 # Django REST Framework Configuration
