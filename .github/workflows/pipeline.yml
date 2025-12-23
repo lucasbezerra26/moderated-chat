@@ -49,6 +49,7 @@ jobs:
       CELERY_BROKER_URL: redis://localhost:6379/0
       MODERATION_PROVIDER: local
       GOOGLE_API_KEY: "fake-key-for-tests"
+      REDIS_PASSWORD: "dev_redis_pass_123"
 
     steps:
     - uses: actions/checkout@v4
