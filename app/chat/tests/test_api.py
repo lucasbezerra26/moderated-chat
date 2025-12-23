@@ -10,29 +10,6 @@ from app.chat.models import Message, Room, RoomParticipant
 
 
 @pytest.fixture
-def api_client() -> APIClient:
-    return APIClient()
-
-
-@pytest.fixture
-def authenticated_client(user: User) -> APIClient:
-    client = APIClient()
-    refresh = RefreshToken.for_user(user)
-    client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
-    return client
-
-
-@pytest.fixture
-def admin_user(db) -> User:
-    return baker.make(User, email="admin@example.com", name="Admin User")
-
-
-@pytest.fixture
-def member_user(db) -> User:
-    return baker.make(User, email="member@example.com", name="Member User")
-
-
-@pytest.fixture
 def room_with_admin(admin_user: User, db) -> Room:
     room = baker.make(Room, name="Test Room", is_private=False)
     baker.make(RoomParticipant, room=room, user=admin_user, role=RoomParticipant.Role.ADMIN)

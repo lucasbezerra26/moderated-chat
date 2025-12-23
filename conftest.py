@@ -1,15 +1,40 @@
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from model_bakery import baker
+from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from app.accounts.models import User
 from app.chat.models import Room
 
 
 @pytest.fixture
+def api_client() -> APIClient:
+    return APIClient()
+
+
+@pytest.fixture
 def user(db):
     """Fixture que cria um usuário autenticado."""
     return baker.make(User, email="test@example.com", name="Test User")
+
+
+@pytest.fixture
+def authenticated_client(user: User) -> APIClient:
+    client = APIClient()
+    refresh = RefreshToken.for_user(user)
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+    return client
+
+
+@pytest.fixture
+def admin_user(db) -> User:
+    return baker.make(User, email="admin@example.com", name="Admin User")
+
+
+@pytest.fixture
+def member_user(db) -> User:
+    return baker.make(User, email="member@example.com", name="Member User")
 
 
 @pytest.fixture

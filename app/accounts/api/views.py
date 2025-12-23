@@ -1,12 +1,14 @@
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from app.accounts.api.serializers import RegisterSerializer, UserSerializer
+from app.accounts.models import User
 
 
 class RegisterView(APIView):
@@ -37,3 +39,22 @@ class RegisterView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Listar usuários",
+        description="Lista todos os usuários do sistema para permitir a adição de participantes em salas.",
+        tags=["Users"],
+    ),
+    retrieve=extend_schema(
+        summary="Detalhes do usuário",
+        tags=["Users"],
+    ),
+)
+class UserViewSet(ReadOnlyModelViewSet):
+    """ViewSet para visualização de usuários."""
+
+    queryset = User.objects.all().order_by("name")
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
