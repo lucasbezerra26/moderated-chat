@@ -2,6 +2,7 @@ import uuid
 
 import structlog
 from celery import shared_task
+from celery.exceptions import SoftTimeLimitExceeded
 from django.db import transaction
 
 from app.chat.models import Message
@@ -15,18 +16,23 @@ logger = structlog.get_logger(__name__)
 @shared_task(
     bind=True, max_retries=3, default_retry_delay=5, autoretry_for=(Exception,), retry_backoff=True, task_time_limit=30
 )
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=5,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    task_time_limit=300,
+    task_soft_time_limit=290,
+    acks_late=True,
+)
 def moderate_message_task(self, message_id: str) -> dict:
     """
-    Task moderar uma mensagem.
+    Task para moderar uma mensagem com garantia de consistência.
 
-    Usa Pessimistic Locking (select_for_update) para garantir idempotência forte.
-    Evita race conditions quando múltiplas tasks tentam processar a mesma mensagem.
-
-    Args:
-        message_id: UUID da mensagem a ser moderada
-
-    Returns:
-        dict: Resultado da moderação com status e detalhes
+    Combina 'acks_late=True' (Garantia de Entrega) com 'select_for_update'
+    (Garantia de Idempotência) para evitar processamento duplicado em caso de
+    retries ou falhas de worker.
     """
     log = logger.bind(message_id=message_id, task_id=self.request.id)
     try:
@@ -72,6 +78,9 @@ def moderate_message_task(self, message_id: str) -> dict:
     except Message.DoesNotExist:
         log.error("message_not_found")
         return {"status": "error", "reason": "Message not found", "message_id": message_id}
+    except SoftTimeLimitExceeded:
+        logger.warning("moderation_timeout_soft", message_id=message_id, retry=self.request.retries)
+        raise self.retry(exc=SoftTimeLimitExceeded("Timeout de moderação atingido"))
     except Exception as exc:
         log.exception("moderation_task_failed", retry_count=self.request.retries)
         raise self.retry(exc=exc)
