@@ -21,7 +21,7 @@ services:
     image: moderated_chat_base:prod
     container_name: moderated_chat_api_prod
     env_file:
-      - .env.prod
+      - .env
     volumes:
       - static_files:/app/staticfiles
     ports:
@@ -33,7 +33,7 @@ services:
     container_name: moderated_chat_worker_prod
     entrypoint: ["/app/scripts/worker_entrypoint.sh"]
     env_file:
-      - .env.prod
+      - .env
     depends_on:
       - api
     restart: always
@@ -42,7 +42,7 @@ services:
     image: postgres:17-alpine
     container_name: moderated_chat_postgres_prod
     env_file:
-      - .env.prod
+      - .env
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -60,7 +60,7 @@ services:
     image: redis:7-alpine
     container_name: moderated_chat_redis_prod
     env_file:
-      - .env.prod
+      - .env
     command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_prod_data:/data
@@ -75,7 +75,7 @@ services:
     image: rabbitmq:4-management-alpine
     container_name: moderated_chat_rabbitmq_prod
     env_file:
-      - .env.prod
+      - .env
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
