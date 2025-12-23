@@ -155,7 +155,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Redis Configuration
 REDIS_HOST = config("REDIS_HOST", default="localhost")
 REDIS_PORT = config("REDIS_PORT", default="6379")
-REDIS_PASSWORD = config("REDIS_PASSWORD")
+REDIS_PASSWORD = config("REDIS_PASSWORD", default="")
 REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
 
 # Django Channels Configuration
@@ -179,6 +179,10 @@ RABBITMQ_URL = f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@{RABBITMQ_HOST}:{RAB
 
 # Celery Configuration
 CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=RABBITMQ_URL)
+
+# Moderation Configuration
+MODERATION_PROVIDER = config("MODERATION_PROVIDER", default="local")
+GOOGLE_API_KEY = config("GOOGLE_API_KEY", default="")
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
