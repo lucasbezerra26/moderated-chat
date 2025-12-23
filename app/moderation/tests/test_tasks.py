@@ -18,7 +18,7 @@ class TestModerationTaskIntegration:
         room = baker.make(Room)
         message = baker.make(Message, room=room, author=user, content="Olá", status=Message.Status.PENDING)
 
-        with patch("app.chat.services.BroadcastService.broadcast_message_to_room") as mock_broadcast:
+        with patch("app.chat.services.broadcast_service.BroadcastService.broadcast_message_to_room") as mock_broadcast:
             result = moderate_message_task(str(message.id))
 
             message.refresh_from_db()
@@ -34,7 +34,7 @@ class TestModerationTaskIntegration:
         room = baker.make(Room)
         message = baker.make(Message, room=room, author=user, content="idiota", status=Message.Status.PENDING)
 
-        with patch("app.chat.services.BroadcastService.notify_author_rejection") as mock_notify:
+        with patch("app.chat.services.broadcast_service.BroadcastService.notify_author_rejection") as mock_notify:
             result = moderate_message_task(str(message.id))
 
             message.refresh_from_db()
@@ -59,7 +59,9 @@ class TestModerationTaskIntegration:
                 verdict="APPROVED", provider="google_gemini", score=1.0, details={"reason": "clean_content"}
             )
 
-            with patch("app.chat.services.BroadcastService.broadcast_message_to_room") as mock_broadcast:
+            with patch(
+                "app.chat.services.broadcast_service.BroadcastService.broadcast_message_to_room"
+            ) as mock_broadcast:
                 result = moderate_message_task(str(message.id))
 
                 message.refresh_from_db()
@@ -87,7 +89,7 @@ class TestModerationTaskIntegration:
                 details={"reason": "Conteúdo contém discurso de ódio"},
             )
 
-            with patch("app.chat.services.BroadcastService.notify_author_rejection") as mock_notify:
+            with patch("app.chat.services.broadcast_service.BroadcastService.notify_author_rejection") as mock_notify:
                 result = moderate_message_task(str(message.id))
 
                 message.refresh_from_db()

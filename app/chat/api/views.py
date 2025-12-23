@@ -19,7 +19,7 @@ from app.chat.api.serializers import (
     RoomSerializer,
 )
 from app.chat.models import Message, Room
-from app.chat.services import RoomService
+from app.chat.services.room_service import RoomService
 
 
 @extend_schema_view(

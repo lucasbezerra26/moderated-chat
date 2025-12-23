@@ -5,7 +5,7 @@ from model_bakery import baker
 
 from app.accounts.models import User
 from app.chat.models import Message, Room
-from app.chat.services import BroadcastService
+from app.chat.services.broadcast_service import BroadcastService
 
 
 @pytest.mark.unit
@@ -19,8 +19,8 @@ class TestBroadcastService:
         mock_group_send = MagicMock()
 
         with (
-            patch("app.chat.services.get_channel_layer", return_value=mock_channel_layer),
-            patch("app.chat.services.async_to_sync", return_value=mock_group_send),
+            patch("app.chat.services.broadcast_service.get_channel_layer", return_value=mock_channel_layer),
+            patch("app.chat.services.broadcast_service.async_to_sync", return_value=mock_group_send),
         ):
             user = baker.make(User, name="Test User", email="test@example.com")
             room = baker.make(Room, name="Test Room")
@@ -46,8 +46,8 @@ class TestBroadcastService:
         mock_group_send = MagicMock()
 
         with (
-            patch("app.chat.services.get_channel_layer", return_value=mock_channel_layer),
-            patch("app.chat.services.async_to_sync", return_value=mock_group_send),
+            patch("app.chat.services.broadcast_service.get_channel_layer", return_value=mock_channel_layer),
+            patch("app.chat.services.broadcast_service.async_to_sync", return_value=mock_group_send),
         ):
             user = baker.make(User, name="Test User", email="test@example.com")
             room = baker.make(Room, name="Test Room")
@@ -73,8 +73,8 @@ class TestBroadcastService:
         mock_group_send = MagicMock()
 
         with (
-            patch("app.chat.services.get_channel_layer", return_value=mock_channel_layer),
-            patch("app.chat.services.async_to_sync", return_value=mock_group_send),
+            patch("app.chat.services.broadcast_service.get_channel_layer", return_value=mock_channel_layer),
+            patch("app.chat.services.broadcast_service.async_to_sync", return_value=mock_group_send),
         ):
             user = baker.make(User, name="Test User", email="test@example.com")
             room = baker.make(Room, name="Test Room")

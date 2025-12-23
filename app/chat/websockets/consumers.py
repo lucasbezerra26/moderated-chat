@@ -6,7 +6,7 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 from app.chat.models import Room
-from app.chat.services import MessageService
+from app.chat.services.message_service import MessageService
 
 logger = structlog.get_logger(__name__)
 

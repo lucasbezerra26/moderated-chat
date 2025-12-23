@@ -5,7 +5,7 @@ from celery import shared_task
 from django.db import transaction
 
 from app.chat.models import Message
-from app.chat.services import BroadcastService
+from app.chat.services.broadcast_service import BroadcastService
 from app.moderation.models import ModerationLog
 from app.moderation.services.moderator import ModerationService
 
