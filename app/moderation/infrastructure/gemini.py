@@ -85,15 +85,7 @@ class GeminiModerator(ModerationStrategy):
 
         except Exception as exc:
             log.exception("gemini_api_error", error=str(exc))
-            return self._fallback_reject(str(exc))
-
-    def _fallback_reject(self, error_msg: str) -> ModerationResult:
-        return ModerationResult(
-            verdict="REJECTED",
-            provider=self.get_provider_name(),
-            score=0.0,
-            details={"reason": "Falha na moderação por IA", "error": error_msg},
-        )
+            raise
 
     def get_provider_name(self) -> str:
         return "google_gemini"
