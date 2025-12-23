@@ -183,6 +183,11 @@ CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=RABBITMQ_URL)
 # Moderation Configuration
 MODERATION_PROVIDER = config("MODERATION_PROVIDER", default="local")
 GOOGLE_API_KEY = config("GOOGLE_API_KEY", default="")
+PROFANITY_LIST = config(
+    "PROFANITY_LIST",
+    default="bobo,idiota,estupido",
+    cast=lambda v: [word.strip() for word in v.split(",") if word.strip()],
+)
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {

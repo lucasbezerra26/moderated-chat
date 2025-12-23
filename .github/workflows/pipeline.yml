@@ -53,6 +53,7 @@ jobs:
       RABBITMQ_DEFAULT_PASS: guest
       CELERY_BROKER_URL: redis://localhost:6379/0
       MODERATION_PROVIDER: local
+      PROFANITY_LIST: bobo
       GOOGLE_API_KEY: "fake-key-for-tests"
 
     steps:

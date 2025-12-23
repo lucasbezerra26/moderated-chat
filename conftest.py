@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 from django.contrib.auth.models import AnonymousUser
 from model_bakery import baker
@@ -57,3 +59,12 @@ def use_in_memory_channel_layer(settings):
             "BACKEND": "channels.layers.InMemoryChannelLayer",
         },
     }
+
+
+@pytest.fixture(autouse=True)
+def mock_gemini_moderation(settings):
+    """Mock do Google Gemini para testes quando o provider é gemini."""
+    settings.MODERATION_PROVIDER = "local"
+    with patch("app.moderation.services.gemini._analyze_text_with_gemini") as mock:
+        mock.return_value = (True, "")
+        yield mock

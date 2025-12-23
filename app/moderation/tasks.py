@@ -7,7 +7,7 @@ from django.db import transaction
 from app.chat.models import Message
 from app.chat.services import BroadcastService
 from app.moderation.models import ModerationLog
-from app.moderation.services import ModerationService
+from app.moderation.services.moderator import ModerationService
 
 logger = structlog.get_logger(__name__)
 
