@@ -1,68 +1,47 @@
-from abc import ABC, abstractmethod
-from typing import Any, Dict
-
+import structlog
 from django.conf import settings
 
-from app.moderation.services.gemini import GeminiModerationService
-from app.moderation.services.local import LocalModerationService
+from app.moderation.domain.strategies import ModerationResult, ModerationStrategy
+from app.moderation.infrastructure.gemini import GeminiModerator
+from app.moderation.infrastructure.local import LocalDictionaryModerator
 
-
-class ModerationStrategy(ABC):
-    """
-    Interface abstrata para estratégias de moderação.
-    Garante que todos os provedores implementem o método moderate.
-    """
-
-    @abstractmethod
-    def moderate(self, content: str) -> Dict[str, Any]:
-        """
-        Analisa conteúdo e retorna veredicto de moderação.
-
-        Args:
-            content: Conteúdo da mensagem a ser moderada
-
-        Returns:
-            Dict contendo verdict, provider, score e details
-        """
-        pass
+logger = structlog.get_logger(__name__)
 
 
 class ModerationService:
     """
-    Contexto do Strategy Pattern para moderação de mensagens.
-    Delega a moderação para o provedor configurado via settings.
+    Application Service: Orquestra estratégias de moderação.
+
+    Responsabilidades:
+    - Selecionar estratégia baseada em configuração
+    - Implementar fallback entre provedores
+    - Expor interface única para camada de tarefas (Celery)
+
+    Esta camada NÃO conhece detalhes de implementação (APIs, arquivos).
+    Apenas orquestra interfaces do Domain.
     """
 
-    _STRATEGIES = {
-        "gemini": GeminiModerationService,
-        "local": LocalModerationService,
+    _STRATEGIES: dict[str, type[ModerationStrategy]] = {
+        "gemini": GeminiModerator,
+        "local": LocalDictionaryModerator,
     }
 
     @staticmethod
-    def _get_provider():
-        """
-        Retorna o provedor de moderação configurado.
-
-        Returns:
-            Instância do provedor configurado via settings.MODERATION_PROVIDER
-
-        Raises:
-            ValueError: Se o provedor configurado for inválido
-        """
-        provider_name = settings.MODERATION_PROVIDER
-
-        strategy_class = ModerationService._STRATEGIES.get(provider_name)
+    def _get_strategy(provider: str) -> ModerationStrategy:
+        strategy_class = ModerationService._STRATEGIES.get(provider)
 
         if not strategy_class:
-            raise ValueError(
-                f"Provedor de moderação inválido: {provider_name}. "
-                f"Opções válidas: {list(ModerationService._STRATEGIES.keys())}"
+            logger.warning(
+                "unknown_provider_fallback",
+                provider=provider,
+                available=list(ModerationService._STRATEGIES.keys()),
             )
+            strategy_class = LocalDictionaryModerator
 
         return strategy_class()
 
     @staticmethod
-    def moderate(content: str) -> Dict[str, Any]:
+    def moderate(content: str) -> ModerationResult:
         """
         Analisa conteúdo usando o provedor configurado.
 
@@ -70,11 +49,37 @@ class ModerationService:
             content: Conteúdo da mensagem a ser moderada
 
         Returns:
-            Dict contendo:
+            ModerationResult contendo:
                 - verdict: "APPROVED" ou "REJECTED"
                 - provider: Nome do provedor de moderação
                 - score: Score de confiança (0.0 a 1.0)
                 - details: Detalhes adicionais incluindo motivo de rejeição
+
+        Raises:
+            Em caso de falha do provedor principal, usa fallback automático para LocalDictionaryModerator
         """
-        provider = ModerationService._get_provider()
-        return provider.moderate(content)
+        provider = settings.MODERATION_PROVIDER.lower()
+        log = logger.bind(provider=provider, content_length=len(content))
+
+        try:
+            strategy = ModerationService._get_strategy(provider)
+            result = strategy.moderate(content)
+            log.info("moderation_success", verdict=result["verdict"])
+            return result
+
+        except Exception as exc:
+            log.warning("primary_strategy_failed_fallback", error=str(exc))
+
+            try:
+                fallback_strategy = LocalDictionaryModerator()
+                result = fallback_strategy.moderate(content)
+                log.info("fallback_success", verdict=result["verdict"])
+                return result
+            except Exception as fallback_exc:
+                log.error("fallback_failed", error=str(fallback_exc))
+                return ModerationResult(
+                    verdict="REJECTED",
+                    provider="system",
+                    score=0.0,
+                    details={"reason": "Todos os provedores falharam", "error": str(fallback_exc)},
+                )
