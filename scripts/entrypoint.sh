@@ -17,7 +17,7 @@ else
     echo "Starting Gunicorn ..."
     exec uv run gunicorn app.asgi:application \
         -k uvicorn.workers.UvicornWorker \
-        -w 1 \
-        --threads 2 \
+        -w 2 \
+        --threads 3 \
         -b 0.0.0.0:8000
 fi
