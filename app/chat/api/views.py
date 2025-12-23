@@ -9,7 +9,7 @@ from rest_framework.viewsets import ModelViewSet
 
 from app.accounts.models import User
 from app.chat.api.pagination import MessageCursorPagination
-from app.chat.api.permissions import IsRoomAdmin, IsRoomParticipant
+from app.chat.api.permissions import IsRoomAdmin, IsRoomParticipant, IsRoomParticipantOrPublic
 from app.chat.api.serializers import (
     AddParticipantSerializer,
     MessageSerializer,
@@ -41,10 +41,11 @@ class RoomViewSet(ModelViewSet):
     lookup_field = "pk"
 
     def get_queryset(self):
+        if self.action == "messages":
+            return Room.objects.all().prefetch_related("memberships")
+
         return (
-            Room.objects.filter(Q(participants=self.request.user) | Q(is_private=False))
-            .prefetch_related("memberships")
-            .order_by("-created_at")
+            Room.objects.filter(participants=self.request.user).prefetch_related("memberships").order_by("-created_at")
         )
 
     def get_serializer_class(self):
@@ -127,7 +128,7 @@ class RoomViewSet(ModelViewSet):
         detail=True,
         methods=["get"],
         url_path="messages",
-        permission_classes=[IsAuthenticated, IsRoomParticipant],
+        permission_classes=[IsAuthenticated, IsRoomParticipantOrPublic],
     )
     def messages(self, request: Request, pk=None) -> Response:
         """Lista mensagens da sala com paginação por cursor.
@@ -135,6 +136,10 @@ class RoomViewSet(ModelViewSet):
         Retorna:
         - Todas as mensagens com status APPROVED.
         - Mensagens do próprio usuário (mesmo se PENDING ou REJECTED).
+
+        Acesso:
+        - Sala pública: Qualquer usuário autenticado
+        - Sala privada: Apenas participantes
         """
         room = self.get_object()
 

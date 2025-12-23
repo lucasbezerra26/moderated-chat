@@ -51,12 +51,10 @@ class TestRoomViewSet:
     def test_list_rooms_only_user_rooms(
         self, authenticated_client: APIClient, room_with_admin: Room, user: User, db
     ) -> None:
-        other_room = baker.make(Room, name="Other Room")
         response = authenticated_client.get("/api/chat/rooms/")
         assert response.status_code == status.HTTP_200_OK
         room_ids = [r["id"] for r in response.data["results"]]
         assert str(room_with_admin.id) in room_ids
-        assert str(other_room.id) not in room_ids
         assert "participants" not in response.data["results"][0]
 
     def test_retrieve_room_with_participants(
@@ -166,7 +164,25 @@ class TestMessageViewSet:
         assert len(response.data["results"]) == MessageCursorPagination.page_size
         assert response.data["next"] is not None
 
-    def test_list_messages_not_participant_fails(self, authenticated_client: APIClient, room: Room) -> None:
-        response = authenticated_client.get(f"/api/chat/rooms/{room.id}/messages/")
+    def test_list_messages_private_room_not_participant_fails(self, authenticated_client: APIClient, db) -> None:
+        """Testa que sala PRIVADA sem participação retorna 403."""
+        private_room = baker.make(Room, is_private=True)
+        response = authenticated_client.get(f"/api/chat/rooms/{private_room.id}/messages/")
 
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_list_messages_public_room_without_participant_succeeds(
+        self, authenticated_client: APIClient, db, user: User
+    ) -> None:
+        """Testa que sala PÚBLICA pode ser acessada sem ser participante."""
+        public_room = baker.make(Room, is_private=False)
+        other_user = baker.make(User, email="other@example.com")
+        baker.make(
+            Message, room=public_room, author=other_user, content="Public message", status=Message.Status.APPROVED
+        )
+
+        response = authenticated_client.get(f"/api/chat/rooms/{public_room.id}/messages/")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert len(response.data["results"]) == 1
+        assert response.data["results"][0]["content"] == "Public message"

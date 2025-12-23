@@ -25,7 +25,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self) -> None:
         """
         Conecta usuário ao WebSocket e adiciona ao grupo da sala.
-        Requer autenticação.
+        Requer autenticação e participação na sala.
         """
         self.room_id = self.scope["url_route"]["kwargs"]["room_id"]
         self.room_group_name = f"chat_{self.room_id}"
@@ -38,10 +38,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.close(code=4001)
             return
 
-        room_exists = await self._check_room_exists()
-        if not room_exists:
+        try:
+            self.room = await self._get_room()
+        except Room.DoesNotExist:
             log.warning("ws_connection_room_not_found")
             await self.close(code=4004)
+            return
+
+        is_allowed = await self._check_permission()
+        if not is_allowed:
+            log.warning("ws_connection_forbidden", reason="not_participant")
+            await self.close(code=4003)
             return
 
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
@@ -85,6 +92,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message_type = data.get("type")
 
             if message_type == "chat_message":
+                is_participant = await self._is_user_participant()
+                if not is_participant:
+                    log.warning("ws_message_denied", reason="no_longer_participant")
+                    await self.send(
+                        text_data=json.dumps({"type": "error", "message": "Você não é mais participante desta sala"})
+                    )
+                    await self.close(code=4003)
+                    return
+
                 await self._handle_chat_message(data)
             else:
                 log.warning("ws_unknown_message_type", type=message_type)
@@ -156,11 +172,41 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({"type": "message_rejected", "message": event["message"]}))
 
     @database_sync_to_async
-    def _check_room_exists(self) -> bool:
-        """Verifica se a sala existe"""
-        return Room.objects.filter(id=self.room_id).exists()
-
-    @database_sync_to_async
     def _get_room(self) -> Room:
         """Obtém instância da sala"""
         return Room.objects.get(id=self.room_id)
+
+    @database_sync_to_async
+    def _check_permission(self) -> bool:
+        """
+        Verifica se o usuário tem permissão para acessar a sala.
+
+        Regras:
+        - Sala pública: Qualquer usuário autenticado pode acessar
+        - Sala privada: Apenas participantes (RoomParticipant) podem acessar
+
+        Returns:
+            bool: True se permitido, False caso contrário
+        """
+        from app.chat.models import RoomParticipant
+
+        if not self.room.is_private:
+            return True
+
+        return RoomParticipant.objects.filter(room=self.room, user=self.user).exists()
+
+    @database_sync_to_async
+    def _is_user_participant(self) -> bool:
+        """
+        Verifica se o usuário ainda é participante da sala.
+        Usado no receive para detectar se foi removido durante a conexão.
+
+        Returns:
+            bool: True se ainda é participante, False caso contrário
+        """
+        from app.chat.models import RoomParticipant
+
+        if not self.room.is_private:
+            return True
+
+        return RoomParticipant.objects.filter(room=self.room, user=self.user).exists()
