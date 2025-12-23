@@ -18,6 +18,6 @@ else
     exec uv run gunicorn app.asgi:application \
         -k uvicorn.workers.UvicornWorker \
         -w 2 \
-        --threads 3 \
+        --threads 2 \
         -b 0.0.0.0:8000
 fi
