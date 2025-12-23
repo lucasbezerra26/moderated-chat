@@ -1,52 +1,69 @@
 # Chat Moderado - Backend
 
-Sistema de chat em tempo real com moderação assíncrona de mensagens, construído com foco em escalabilidade, resiliência e alta performance.
+Sistema de chat em tempo real com moderação assíncrona de mensagens.
 
-## Como Executar
+## 🚀 Como Executar
 
-### Desenvolvimento
-O ambiente de desenvolvimento utiliza Docker Compose com suporte a hot-reload.
+Copie o arquivo de variáveis de ambiente:
 
-1. **Pré-requisitos**: Docker e Docker Compose instalados.
-2. **Configuração**: Certifique-se de que o arquivo `.env` existe na raiz.
-3. **Execução**:
-   ```bash
-   docker-compose up --build
-   ```
-   O serviço estará disponível em `http://localhost:8000`.
+```bash
+cp .env.example .env
 
-### Produção
-A configuração de produção utiliza imagens multi-stage e servidores de aplicação de alta performance.
+```
 
-1. **Configuração**: Crie um arquivo `.env.prod`.
-2. **Execução**:
-   ```bash
-   docker-compose -f docker-compose.prod.yml up --build -d
-   ```
-   Em produção, o sistema utiliza **Gunicorn** com workers **Uvicorn** (`gunicorn app.asgi:application -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000`), garantindo o suporte nativo a protocolos assíncronos (ASGI) com a robustez do Gunicorn.
+### Ambiente de Desenvolvimento
 
-## Decisões Técnicas e Arquitetura
+Utiliza Docker Compose com *bind mounts* para hot-reload e debug facilitado.
 
-### 1. Stack e Frameworks
-- **Django 5.2**: Escolhido por ser a versão mais estável e recente, oferecendo melhorias significativas em suporte assíncrono e performance de ORM.
-- **Django Channels**: Utilizado para gerenciar a comunicação bidirecional via WebSockets.
-- **Celery + RabbitMQ**: Orquestração de tarefas assíncronas (moderação) com garantia de entrega.
+```bash
+docker-compose up -d --build
 
-### 2. Fluxo de Mensagens e Moderação
-O sistema utiliza uma abordagem de consistência eventual para garantir que o chat permaneça fluido enquanto o conteúdo é analisado:
-- **Identificação no Frontend**: Ao enviar uma mensagem, o WebSocket retorna imediatamente um evento `message_queued` contendo o `id` da mensagem criada no banco. Isso permite que o frontend atualize o estado local da mensagem de "enviando" para "pendente" de forma precisa.
-- **Isolamento de Processamento**: A moderação ocorre em background. Se aprovada, a mensagem é enviada a todos na sala via Channel Layer. Se rejeitada, apenas o autor recebe a notificação, evitando poluição visual para os demais usuários.
-- **ModerationLog**: Todas as decisões de moderação (veredicto, score, provedor) são persistidas nesta entidade, permitindo auditoria completa e análise histórica do comportamento de filtros de conteúdo.
+```
 
-### 3. Escalabilidade e Performance
-- **Cursor-based Pagination**: Para a listagem de mensagens, optamos por `CursorPagination`. Diferente do `OffsetPagination`, ele é imutável em relação a novas inserções, o que é essencial para implementar **scroll infinito** no frontend sem duplicação de itens.
-- **Idempotência**: O processamento de moderação utiliza `select_for_update` (Pessimistic Locking) no banco de dados para garantir que, mesmo em cenários de retries agressivos ou concorrência pesada de workers, uma mensagem nunca seja processada duas vezes simultaneamente.
+Disponível em: `http://localhost:8000`
 
-### 4. Estratégia de Testes
-O projeto mantém uma separação clara entre tipos de testes para otimizar o ciclo de feedback no CI:
-- **Testes Unitários**: Focam na lógica de negócio pura (services, logic) e rodam de forma isolada e rápida.
-- **Testes de Integração**: Validam o fluxo completo, incluindo handshakes de WebSocket, persistência real em banco de dados e disparo de tasks Celery (mockadas em sua execução, mas validadas em seu disparo).
-No pipeline do GitHub Actions, essas etapas rodam em steps separados para facilitar a identificação de falhas de lógica versus falhas de infraestrutura.
+### Ambiente de Produção
 
-### 5. Observabilidade
-- **Logs Estruturados**: Implementação com `structlog` gerando JSON em produção, permitindo integração direta com ferramentas de log aggregation (ELK, Datadog).
+Utiliza construção *multi-stage* otimizada para segurança e tamanho de imagem.
+
+```bash
+docker-compose -f docker-compose.prod.yml up --build -d
+
+```
+
+**Nota sobre a Arquitetura de Servidor:**
+Em produção, optou-se pela utilização do **Gunicorn** atuando como gerenciador de processos (process manager) para orquestrar workers **Uvicorn**. Essa abordagem delega ao Gunicorn a responsabilidade de monitoramento de processos, restarts e gerenciamento de sinais de sistema, enquanto os workers Uvicorn processam o protocolo ASGI de alta performance necessário para os WebSockets.
+
+---
+
+## 🏛 Decisões Arquiteturais e Técnicas
+
+### 1. Stack Tecnológica
+
+* **Django 5.2 + DRF**: Framework base, utilizado pela maturidade e ecossistema robusto.
+* **Django Channels (ASGI)**: Para gerenciamento de conexões persistentes (WebSockets) e stateful communication.
+* **Celery + Redis**: Fila de tarefas para processamento assíncrono da moderação, desacoplando a resposta da API do tempo de inferência da IA.
+* **PostgreSQL**: Persistência relacional robusta.
+* **Structlog**: Logs estruturados (JSON) para garantir observabilidade em ferramentas de agregação (Datadog/ELK).
+
+### 2. Pipeline de Moderação e Consistência
+
+A arquitetura resolve o desafio de moderar mensagens sem travar a interface do usuário (UI Blocking):
+
+* **Feedback Otimista & Eventos de Estado**: O WebSocket não espera a moderação. Ele confirma o recebimento (`message_queued`) com o ID da mensagem. O Frontend exibe a mensagem como "Pendente".
+* **Design Pattern na Moderação**: O sistema utiliza uma camada de serviço (Service Layer) para a moderação. Atualmente configurado com um *Mock/Regex Provider*, mas desenhado para fácil injeção de dependência de serviços externos (como Azure AI ou OpenAI) sem refatoração do domínio.
+* **Auditoria (ModerationLog)**: Decisões de moderação não são efêmeras. Uma entidade dedicada persiste o *score*, o *veredicto* e o *provedor* utilizado, permitindo auditoria e *fine-tuning* futuro das regras.
+
+### 3. Concorrência e Integridade de Dados
+
+Para garantir a robustez em um ambiente distribuído com múltiplos workers:
+
+* **Controle de Concorrência (Pessimistic Locking)**: A task do Celery utiliza `select_for_update()` ao processar a moderação. Isso garante a **Idempotência técnica** a nível de banco de dados, impedindo que "Race Conditions" (comuns em retries de fila) processem ou cobrem pela mesma mensagem duas vezes.
+* **Paginação por Cursor**: A API de histórico utiliza `CursorPagination`. Essa decisão evita os problemas clássicos de `OffsetPagination` (mensagens puladas ou duplicadas) quando novos itens são inseridos no topo da lista durante o scroll do usuário.
+
+## 🧪 Qualidade e Testes
+
+O projeto segue uma pirâmide de testes focada em confiabilidade:
+
+* **Unitários**: Focados em Services e Models, garantindo regras de negócio isoladas.
+* **Integração**: Testes que sobem o banco de dados e validam o fluxo completo (Consumer -> DB -> Celery Task). Utiliza `pytest-asyncio` para validar o comportamento dos WebSockets.
