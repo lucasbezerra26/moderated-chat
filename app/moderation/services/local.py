@@ -1,24 +1,18 @@
-from typing import Dict
+from typing import Any, Dict
+
+from django.conf import settings
 
 from app.chat.models import Message
 
 
-class ModerationService:
+class LocalModerationService:
     """
-    Service responsável por moderar mensagens.
-    Implementação inicial: Pass-through que aprova tudo automaticamente.
-    Preparado para futura integração com OpenAI/Azure.
+    Service de moderação local usando dicionário de palavras proibidas.
     """
 
-    PROFANITY_LIST = ["bobo", "idiota", "estupido"]
-
-    @staticmethod
-    def moderate(content: str) -> Dict[str, any]:
+    def moderate(self, content: str) -> Dict[str, Any]:
         """
-        Analisa conteúdo e retorna veredicto de moderação.
-
-        Implementação atual: Verifica palavras proibidas localmente.
-        Futuro: Integração com OpenAI Moderation API.
+        Analisa conteúdo verificando palavras proibidas localmente.
 
         Args:
             content: Conteúdo da mensagem a ser moderada
@@ -32,13 +26,13 @@ class ModerationService:
         """
         content_lower = content.lower()
 
-        for word in ModerationService.PROFANITY_LIST:
+        for word in settings.PROFANITY_LIST:
             if word in content_lower:
                 return {
                     "verdict": Message.Status.REJECTED,
                     "provider": "local_dictionary",
                     "score": 1.0,
-                    "details": {"reason": "profanity_detected", "matched_word": word},
+                    "details": {"reason": f"Palavra proibida detectada: {word}"},
                 }
 
         return {
