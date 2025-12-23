@@ -2,6 +2,8 @@
 
 Sistema de chat em tempo real com moderação assíncrona de mensagens usando arquitetura DDD/Clean Architecture.
 
+**🔗 Frontend:** [moderated-chat-front](https://github.com/lucasbezerra26/moderated-chat-front)
+
 ## 🚀 Como Executar
 
 Copie o arquivo de variáveis de ambiente:
@@ -63,6 +65,33 @@ docker-compose -f docker-compose.prod.yml up --build -d
 
 **Nota sobre a Arquitetura de Servidor:**
 Em produção, optou-se pela utilização do **Gunicorn** atuando como gerenciador de processos (process manager) para orquestrar workers **Uvicorn**. Essa abordagem delega ao Gunicorn a responsabilidade de monitoramento de processos, restarts e gerenciamento de sinais de sistema, enquanto os workers Uvicorn processam o protocolo ASGI necessário para os WebSockets.
+
+## ☁️ Infraestrutura e Deploy (Azure)
+
+A infraestrutura de produção está hospedada na **Microsoft Azure** (West US), utilizando uma arquitetura distribuída para isolar a camada de aplicação, a camada de mensageria e a persistência de dados.
+
+**🔗 URL da Aplicação:** [https://4.155.72.118](https://4.155.72.118)
+
+### Topologia
+
+| Recurso | Função | Especificações (SKU) | Serviços |
+| :--- | :--- | :--- | :--- |
+| **App Server** (`chat1`) | Aplicação & Processamento | **Standard B2ats v2**<br>(2 vCPUs, 1 GiB RAM)<br>Ubuntu 22.04 LTS | • Nginx (Proxy Reverso)<br>• Django API (Gunicorn/Uvicorn)<br>• Celery Worker |
+| **Broker Server** (`chat2`) | Mensageria & Cache | **Standard B2ats v2**<br>(2 vCPUs, 1 GiB RAM)<br>Ubuntu 22.04 LTS | • RabbitMQ 4 (Broker)<br>• Redis 7 (Channel Layer) |
+| **Database** | Persistência Relacional | **Azure Database for PostgreSQL**<br>(Flexible Server)<br>PostgreSQL 17.7 | • Managed Service (PaaS)<br>• Tier: Burstable (B1ms)<br>• 1 vCore, 2 GiB RAM |
+
+### Detalhes da Configuração
+
+1. **Segurança de Rede (NSG)**:
+   * O **Banco de Dados** e o servidor de **Broker/Cache** (`chat2`) não expõem portas para a internet pública aberta.
+   * O acesso ao Redis (6379) e RabbitMQ (5672) é restrito via Firewall (Azure NSG + UFW) exclusivamente para o IP da máquina de aplicação (`chat1`).
+   * Apenas o **App Server** (`chat1`) expõe as portas HTTP (80) e HTTPS (443).
+
+2. **Server-Side Rendering & Proxy**:
+   * O **Nginx** atua como *Gateway*, servindo os arquivos estáticos (Vue.js build + Django Static) e roteando requisições de API (`/api`) e WebSocket (`/ws`) para o container da aplicação.
+
+3. **Gerenciamento de Processos**:
+   * Utilizamos **Docker Compose** em modo de produção para orquestração dos containers em ambas as máquinas virtuais, garantindo consistência de ambiente e isolamento de dependências.
 
 ---
 
