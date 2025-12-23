@@ -45,7 +45,9 @@ class RoomViewSet(ModelViewSet):
             return Room.objects.all().prefetch_related("memberships")
 
         return (
-            Room.objects.filter(participants=self.request.user).prefetch_related("memberships").order_by("-created_at")
+            Room.objects.filter(Q(participants=self.request.user) | Q(is_private=False))
+            .prefetch_related("memberships")
+            .order_by("-created_at")
         )
 
     def get_serializer_class(self):
