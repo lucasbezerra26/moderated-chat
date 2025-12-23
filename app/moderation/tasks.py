@@ -14,9 +14,6 @@ logger = structlog.get_logger(__name__)
 
 
 @shared_task(
-    bind=True, max_retries=3, default_retry_delay=5, autoretry_for=(Exception,), retry_backoff=True, task_time_limit=30
-)
-@shared_task(
     bind=True,
     max_retries=3,
     default_retry_delay=5,
