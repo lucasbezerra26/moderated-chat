@@ -13,6 +13,14 @@ services:
     depends_on:
       - api
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
 
   api:
     build:
@@ -27,6 +35,14 @@ services:
     ports:
       - "8000:8000"
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 384M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
 
   worker:
     image: moderated_chat_base:prod
@@ -37,6 +53,14 @@ services:
     depends_on:
       - api
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
 
   postgres:
     image: postgres:17-alpine
@@ -55,13 +79,21 @@ services:
       timeout: 5s
       retries: 5
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
 
   redis:
     image: redis:7-alpine
     container_name: moderated_chat_redis_prod
     env_file:
       - .env
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 64mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_prod_data:/data
     healthcheck:
@@ -70,6 +102,14 @@ services:
       timeout: 5s
       retries: 5
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.15'
+          memory: 80M
+        reservations:
+          cpus: '0.05'
+          memory: 48M
 
   rabbitmq:
     image: rabbitmq:4-management-alpine
@@ -79,6 +119,7 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_VM_MEMORY_HIGH_WATERMARK: 0.6
     volumes:
       - rabbitmq_prod_data:/var/lib/rabbitmq
     healthcheck:
@@ -87,6 +128,14 @@ services:
       timeout: 5s
       retries: 5
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
 
 volumes:
   postgres_prod_data:
