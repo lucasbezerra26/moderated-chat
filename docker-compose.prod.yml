@@ -9,7 +9,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./certs:/etc/nginx/certs:ro
       - static_files:/app/staticfiles:ro
-      - frontend_dist:/app/frontend_dist:ro
+      - ./frontend_dist:/app/frontend_dist:ro
     depends_on:
       - api
     restart: always
@@ -93,4 +93,3 @@ volumes:
   redis_prod_data:
   rabbitmq_prod_data:
   static_files:
-  frontend_dist:
