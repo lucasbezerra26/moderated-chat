@@ -46,6 +46,11 @@ jobs:
       POSTGRES_PORT: 5432
       REDIS_HOST: localhost
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      RABBITMQ_HOST: localhost
+      RABBITMQ_PORT: 5672
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
       CELERY_BROKER_URL: redis://localhost:6379/0
       MODERATION_PROVIDER: local
       GOOGLE_API_KEY: "fake-key-for-tests"
