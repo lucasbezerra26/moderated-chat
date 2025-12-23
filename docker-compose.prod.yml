@@ -1,4 +1,19 @@
 services:
+  nginx:
+    image: nginx:alpine
+    container_name: moderated_chat_nginx_prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - static_files:/app/staticfiles:ro
+      - frontend_dist:/app/frontend_dist:ro
+    depends_on:
+      - api
+    restart: always
+
   api:
     build:
       context: .
@@ -88,3 +103,4 @@ volumes:
   redis_prod_data:
   rabbitmq_prod_data:
   static_files:
+  frontend_dist:

@@ -209,3 +209,13 @@ __marimo__/
 .github
 .idea/
 .vscode/
+
+# SSL Certificates
+certs/
+nginx/certs/
+*.crt
+*.key
+
+# Build artifacts
+dist/
+frontend_dist/
