@@ -151,8 +151,6 @@ Esta versão destaca as decisões de design **Sênior** (resiliência, idempotê
 
 ---
 
-### Copie e cole no seu README:
-
 ### 2. Pipeline de Moderação e Resiliência
 
 A arquitetura resolve o desafio de moderar mensagens com IA garantindo que a experiência do usuário seja fluida e que as mensagens não sejam perdida, mesmo em cenários de falha.
